@@ -15,7 +15,7 @@ import socketserver
 import tempfile
 try:
     import winreg
-except Exception:  # pragma: no cover - non-Windows
+except Exception:
     winreg = None
 from http import HTTPStatus
 from urllib.parse import urlparse, parse_qs, unquote
@@ -27,9 +27,9 @@ from typing import Dict, List, Optional, Union, Any, Tuple, Callable
 term_width = shutil.get_terminal_size().columns
 LEFT_WIDTH = int(term_width * 0.55)
 
-AUTO_UPDATE_LLAMA = True  
-HTTP_PORT = 8080  
-_AUTO_UPDATE_FLAG = "_AUTO_UPDATE_IN_PROGRESS"  
+AUTO_UPDATE_LLAMA = True
+HTTP_PORT = 8080
+_AUTO_UPDATE_FLAG = "_AUTO_UPDATE_IN_PROGRESS"
 PLAN_FILENAME = "CMDAIPLAN.md"
 MD_CONTEXT_MAX_FILES = 14
 MD_CONTEXT_MAX_CHARS = 12000
@@ -49,16 +49,15 @@ SLASH_COMMAND_HINTS: List[Tuple[str, str]] = [
     ("/status", "Show status"),
 ]
 
-# ============ MODE SYSTEM ============
 class AppMode:
     CHAT = "chat"
-    PLAN = "plan"  
+    PLAN = "plan"
     CODE = "code"
-    
+
     @staticmethod
     def list():
         return [AppMode.CHAT, AppMode.PLAN, AppMode.CODE]
-    
+
     @staticmethod
     def description(mode):
         descriptions = {
@@ -72,7 +71,6 @@ CURRENT_MODE = AppMode.CHAT
 MODE_INDICATOR = ""
 
 def get_mode_prompt() -> str:
-    """Zwraca prompt zależny od aktualnego trybu"""
     if not loader or not loader.current_model:
         return "> "
     if CURRENT_MODE == AppMode.CHAT:
@@ -93,10 +91,10 @@ class Colors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
-    MODE_CHAT = '\033[38;5;82m'    # Jasny zielony
-    MODE_PLAN = '\033[38;5;208m'   # Pomarańczowy
-    MODE_CODE = '\033[38;5;39m'    # Niebieski
-    ACTION_STATUS = '\033[90m'     # Szary dla statusów akcji
+    MODE_CHAT = '\033[38;5;82m'
+    MODE_PLAN = '\033[38;5;208m'
+    MODE_CODE = '\033[38;5;39m'
+    ACTION_STATUS = '\033[90m'
 
 HAS_AI_ENGINE = False
 LAST_UPDATE_STATUS = None
@@ -106,12 +104,11 @@ _LLAMA_LOG_CONFIGURED = False
 _LLAMA_LOG_CALLBACK = None
 TERMINAL_CHAT_HISTORY: List[Dict[str, str]] = []
 INPUT_AREA_START_ROW = 1
-INPUT_AREA_CLEAR_LINES = 4  # Zmniejszone z 8 do 4 - mniej pustych linii
+INPUT_AREA_CLEAR_LINES = 4
 ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 STATUS_CALL_RE = re.compile(r"\[\[CALL:STATUS\]\](.*?)\[\[/CALL\]\]", re.IGNORECASE | re.DOTALL)
 ACTION_RE = re.compile(r"\[\[ACTION\]\](.*?)\[\[/ACTION\]\]", re.IGNORECASE | re.DOTALL)
 
-# ============ IDE INTEGRATION ============
 class IDEIntegration:
     SUPPORTED_IDES = {
         "windsurf": {
@@ -163,23 +160,23 @@ class IDEIntegration:
             "cli_args": "+{line} {file}"
         }
     }
-    
+
     def __init__(self):
         self.detected_ides = []
         self.active_ide = None
         self.project_root = None
         self._detect_ides()
         self._find_project_root()
-    
+
     def _detect_ides(self):
         import platform
         system = platform.system().lower()
-        
+
         for ide_id, ide_info in self.SUPPORTED_IDES.items():
             exe_names = ide_info.get(system, [])
             if not exe_names:
                 exe_names = ide_info.get("linux", [])
-            
+
             for exe in exe_names:
                 path = self._find_executable(exe)
                 if path:
@@ -193,7 +190,7 @@ class IDEIntegration:
                     if not self.active_ide:
                         self.active_ide = self.detected_ides[-1]
                     break
-    
+
     def _find_executable(self, name):
         for path_dir in os.environ.get("PATH", "").split(os.pathsep):
             full_path = os.path.join(path_dir, name)
@@ -203,18 +200,18 @@ class IDEIntegration:
                 full_path_exe = full_path + ".exe"
                 if os.path.isfile(full_path_exe):
                     return full_path_exe
-        
+
         common_paths = self._get_common_paths(name)
         for path in common_paths:
             if os.path.exists(path):
                 return path
         return None
-    
+
     def _get_common_paths(self, name):
         paths = []
         import platform
         system = platform.system()
-        
+
         if system == "Windows":
             program_files = [
                 os.environ.get("ProgramFiles", "C:\\Program Files"),
@@ -243,22 +240,22 @@ class IDEIntegration:
                 f"/opt/{name}/bin/{name}",
                 os.path.expanduser(f"~/.local/bin/{name}")
             ])
-        
+
         return paths
-    
+
     def _find_project_root(self):
         current = os.getcwd()
         markers = [".git", ".vscode", "pyproject.toml", "setup.py", "package.json", ".idea", "requirements.txt"]
-        
+
         while current != os.path.dirname(current):
             for marker in markers:
                 if os.path.exists(os.path.join(current, marker)):
                     self.project_root = current
                     return
             current = os.path.dirname(current)
-        
+
         self.project_root = os.getcwd()
-    
+
     def list_ides(self):
         return self.detected_ides
 
@@ -270,24 +267,24 @@ class IDEIntegration:
         if previous_active:
             self.set_active(previous_active)
         return self.detected_ides
-    
+
     def set_active(self, ide_id):
         for ide in self.detected_ides:
             if ide["id"] == ide_id:
                 self.active_ide = ide
                 return True
         return False
-    
+
     def open_file(self, filepath, line=1, col=1):
         if not self.active_ide:
             return {"success": False, "error": "No IDE detected"}
-        
+
         if not os.path.isabs(filepath) and self.project_root:
             filepath = os.path.join(self.project_root, filepath)
-        
+
         if not os.path.exists(filepath):
             return {"success": False, "error": f"File not found: {filepath}"}
-        
+
         try:
             cli_tmpl = self.active_ide.get("cli_args", "{file}")
             args = [self.active_ide["path"]]
@@ -307,22 +304,22 @@ class IDEIntegration:
                 subprocess.Popen(full_cmd, shell=True)
             else:
                 subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
+
             return {"success": True, "ide": self.active_ide["name"], "file": filepath}
         except Exception as e:
             return {"success": False, "error": str(e)}
-    
+
     def create_file(self, filepath, content=""):
         if not os.path.isabs(filepath) and self.project_root:
             filepath = os.path.join(self.project_root, filepath)
-        
+
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        
+
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(content)
-        
+
         return self.open_file(filepath)
-    
+
     def get_status(self):
         return {
             "active": self.active_ide["name"] if self.active_ide else None,
@@ -390,10 +387,7 @@ class IDEIntegration:
 
 ide_integration = None
 
-# ============ CODE FILE MANAGER ============
 class CodeFileManager:
-    """Zarządza plikami kodu tworzonymi przez AI w trybie CODE"""
-
     MD_SKIP_DIRS = {
         ".git",
         "models",
@@ -412,11 +406,9 @@ class CodeFileManager:
         self.last_applied_changes: List[Dict[str, Any]] = []
 
     def set_plan(self, plan_content: str):
-        """Ustawia plan z trybu PLAN do wykorzystania w CODE"""
         self.current_plan = plan_content
 
     def extract_code_blocks(self, ai_response: str) -> List[Dict[str, Any]]:
-        """Wyciąga bloki kodu z odpowiedzi AI"""
         code_blocks = []
 
         pattern = r"```([^\n`]*)\n(.*?)```"
@@ -440,7 +432,6 @@ class CodeFileManager:
         return code_blocks
 
     def get_extension(self, language: str) -> str:
-        """Zwraca rozszerzenie pliku na podstawie języka"""
         extensions = {
             "python": ".py", "py": ".py",
             "javascript": ".js", "js": ".js",
@@ -458,7 +449,6 @@ class CodeFileManager:
         return extensions.get(language.lower(), ".txt")
 
     def generate_filename(self, language: str, index: int) -> str:
-        """Generuje nazwę pliku na podstawie języka"""
         ext = self.get_extension(language)
         timestamp = int(time.time())
         if not ext.startswith("."):
@@ -583,7 +573,6 @@ class CodeFileManager:
             if not rel_path:
                 rel_path = self._extract_path_from_prefix(ai_response, block.get("start_index", 0))
             if not rel_path:
-                # Ignore unnamed blocks to avoid fake/generated file names.
                 continue
             rel_path = self._normalize_relative_path(rel_path)
             if not rel_path:
@@ -640,13 +629,11 @@ class CodeFileManager:
         return applied
 
     def save_code_blocks(self, ai_response: str) -> List[str]:
-        """Zachowana kompatybilność: zapisuje wykryte pliki i zwraca ścieżki."""
         changes = self.extract_file_changes(ai_response)
         applied = self.apply_file_changes(changes)
         return [item["path"] for item in applied]
 
     def create_plan_file(self, content: str) -> str:
-        """Tworzy plik planu dla trybu PLAN."""
         filepath = os.path.join(self.project_root, PLAN_FILENAME)
         try:
             with open(filepath, "w", encoding="utf-8") as f:
@@ -742,7 +729,7 @@ def load_model_aliases():
     aliases = {}
     if not os.path.exists("models"):
         return aliases
-    
+
     for filename in os.listdir("models"):
         if filename.endswith('.gguf') and 'mmproj' not in filename.lower():
             alias_name = filename[:-5]
@@ -760,7 +747,7 @@ def _parse_version_tuple(version_text: str) -> Tuple[int, int, int]:
         out.append(int(digits) if digits else 0)
     while len(out) < 3:
         out.append(0)
-    return tuple(out)  
+    return tuple(out)
 
 def _is_arch_known_unsupported(arch: str, llama_version: str) -> bool:
     max_version = KNOWN_UNSUPPORTED_ARCH_BY_MAX_VERSION.get((arch or "").strip().lower())
@@ -881,27 +868,27 @@ class OutputFilter:
         self.in_tag = False
         self.current_tag = ""
         self.keep_tags = ["/im_end", "im_end"]
-    
+
     def feed(self, text: str) -> str:
         self.buffer += text
         result = []
         i = 0
         n = len(self.buffer)
-        
+
         while i < n:
             if self.buffer[i] == '<' and i + 1 < n and self.buffer[i+1] == '|':
                 tag_start = i
-                i += 2  
+                i += 2
                 tag_name = ""
-                
+
                 while i < n and self.buffer[i] != '|' and self.buffer[i] != '>':
                     tag_name += self.buffer[i]
                     i += 1
-                
+
                 if i < n and self.buffer[i] == '|' and i + 1 < n and self.buffer[i+1] == '>':
-                    i += 2  
+                    i += 2
                     tag = f"<|{tag_name}|>"
-                    
+
                     if tag_name.startswith("im_start") or tag_name.startswith("system") or tag_name.startswith("user"):
                         self.in_tag = True
                         self.current_tag = tag_name
@@ -918,7 +905,7 @@ class OutputFilter:
                 if not self.in_tag:
                     result.append(self.buffer[i])
                 i += 1
-        
+
         self.buffer = self.buffer[i:] if i < n else ""
         return "".join(result)
 
@@ -1258,10 +1245,10 @@ class SimpleGGUFLoader:
     def download_model(self, source: str, output_name: Optional[str] = None, overwrite: bool = False) -> Dict[str, Any]:
         import urllib.request
         import urllib.error
-        
+
         if not os.path.exists(self.models_dir):
             os.makedirs(self.models_dir)
-        
+
         if source.startswith(('http://', 'https://', 'file://')):
             url = source
             filename = output_name or os.path.basename(urlparse(source).path) or "model.gguf"
@@ -1289,9 +1276,9 @@ class SimpleGGUFLoader:
                 }
             else:
                 raise ValueError(f"Source not found: {source}")
-        
+
         destination = os.path.join(self.models_dir, filename)
-        
+
         if os.path.exists(destination) and not overwrite:
             return {
                 "status": "already_exists",
@@ -1300,10 +1287,10 @@ class SimpleGGUFLoader:
                 "size": os.path.getsize(destination),
                 "sha256": self._sha256_file(destination),
             }
-        
+
         print(f"Downloading from {url}...")
         urllib.request.urlretrieve(url, destination)
-        
+
         return {
             "status": "downloaded",
             "name": filename,
@@ -1311,7 +1298,7 @@ class SimpleGGUFLoader:
             "size": os.path.getsize(destination),
             "sha256": self._sha256_file(destination),
         }
-    
+
     def _sha256_file(self, filepath: str) -> str:
         sha256_hash = hashlib.sha256()
         with open(filepath, "rb") as f:
@@ -1322,10 +1309,8 @@ class SimpleGGUFLoader:
     def list_model_aliases(self):
         return []
 
-
-# ============ HTTP SERVER HANDLER ============
 class OllamaAPIHandler(http.server.BaseHTTPRequestHandler):
-    
+
     def _set_headers(self, status_code=200, content_type='application/json'):
         self.send_response(status_code)
         self.send_header('Content-Type', content_type)
@@ -1423,7 +1408,7 @@ class OllamaAPIHandler(http.server.BaseHTTPRequestHandler):
 
     def _handle_tags(self):
         models = loader.list_models()
-        
+
         response = {
             "models": [
                 {
@@ -1442,10 +1427,10 @@ class OllamaAPIHandler(http.server.BaseHTTPRequestHandler):
                 for m in models
             ]
         }
-        
+
         self._set_headers(200)
         self.wfile.write(json.dumps(response, indent=2).encode())
-    
+
     def _handle_show_model(self):
         if not loader.current_model:
             self._set_headers(400)
@@ -1479,10 +1464,10 @@ class OllamaAPIHandler(http.server.BaseHTTPRequestHandler):
                 "llama.cpp": "master"
             }
         }
-        
+
         self._set_headers(200)
         self.wfile.write(json.dumps(version_info, indent=2).encode())
-    
+
     def _handle_generate(self, data: Dict):
         if not loader.current_model:
             self._set_headers(400)
@@ -1565,7 +1550,7 @@ class OllamaAPIHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('Cache-Control', 'no-cache')
         self.send_header('Connection', 'keep-alive')
         self.end_headers()
-        
+
         try:
             response_generator = loader.generate(
                 prompt=prompt,
@@ -1574,22 +1559,22 @@ class OllamaAPIHandler(http.server.BaseHTTPRequestHandler):
                 top_p=top_p,
                 stream=True
             )
-            
+
             full_response = ""
-            
+
             for token in response_generator:
                 full_response += token
-                
+
                 response_obj = {
                     "model": loader.current_model,
                     "created_at": datetime.now().isoformat() + "Z",
                     "response": token,
                     "done": False
                 }
-                
+
                 self.wfile.write(f"data: {json.dumps(response_obj)}\n\n".encode())
                 self.wfile.flush()
-            
+
             final_response = {
                 "model": loader.current_model,
                 "created_at": datetime.now().isoformat() + "Z",
@@ -1603,10 +1588,10 @@ class OllamaAPIHandler(http.server.BaseHTTPRequestHandler):
                 "eval_count": len(full_response.split()),
                 "eval_duration": 0
             }
-            
+
             self.wfile.write(f"data: {json.dumps(final_response)}\n\n".encode())
             self.wfile.write(b"data: [DONE]\n\n")
-            
+
         except Exception as e:
             error_response = {"error": str(e)}
             self.wfile.write(f"data: {json.dumps(error_response)}\n\n".encode())
@@ -1670,29 +1655,29 @@ class OllamaAPIHandler(http.server.BaseHTTPRequestHandler):
         for msg in messages:
             role = msg.get('role', 'user')
             content = msg.get('content', '')
-            
+
             if role == 'system':
                 formatted.append(f"<|system|>\n{content}\n<|end|>")
             elif role == 'user':
                 formatted.append(f"<|user|>\n{content}\n<|end|>")
             elif role == 'assistant':
                 formatted.append(f"<|assistant|>\n{content}\n<|end|>")
-        
+
         return "\n".join(formatted) + "\n<|assistant|>\n"
 
-    def _stream_chat_response(self, messages: List[Dict], prompt: str, max_tokens: int, 
+    def _stream_chat_response(self, messages: List[Dict], prompt: str, max_tokens: int,
                             temperature: float, top_p: float):
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream')
         self.send_header('Cache-Control', 'no-cache')
         self.send_header('Connection', 'keep-alive')
         self.end_headers()
-        
+
         try:
             if not loader or not loader.model:
                 self.wfile.write(b'data: {"error": "No model loaded"}\n\n')
                 return
-            
+
             full_response = ""
             for token in loader.generate(prompt, max_tokens, temperature, top_p, stream=True):
                 if token:
@@ -1708,7 +1693,7 @@ class OllamaAPIHandler(http.server.BaseHTTPRequestHandler):
                     }
                     self.wfile.write(f'data: {json.dumps(response_data)}\n\n'.encode())
                     self.wfile.flush()
-            
+
             final_data = {
                 "model": loader.current_model or "unknown",
                 "created_at": time.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
@@ -1726,12 +1711,12 @@ class OllamaAPIHandler(http.server.BaseHTTPRequestHandler):
             }
             self.wfile.write(f'data: {json.dumps(final_data)}\n\n'.encode())
             self.wfile.flush()
-            
+
         except Exception as e:
             error_data = {"error": f"Streaming error: {str(e)}"}
             self.wfile.write(f'data: {json.dumps(error_data)}\n\n'.encode())
             self.wfile.flush()
-        
+
     def _handle_pull(self, data: Dict):
         source = str(data.get("name") or data.get("model") or data.get("source") or "").strip()
         output_name = data.get("filename") or data.get("output")
@@ -1776,7 +1761,6 @@ class OllamaAPIHandler(http.server.BaseHTTPRequestHandler):
             "status": "success"
         }).encode())
 
-
 class ReusableTCPServer(socketserver.TCPServer):
     allow_reuse_address = True
 
@@ -1815,12 +1799,8 @@ def clear_screen():
     if not (stdin_ok and stdout_ok):
         return
     os.system('cls' if os.name == 'nt' else 'clear')
-    # Reset scroll region after full clear.
     sys.stdout.write("\x1b[r")
     sys.stdout.flush()
-
-
-# ============ INPUT HANDLING ============
 
 def _read_terminal_line(prompt: str) -> str:
     stdin_ok = hasattr(sys.stdin, "isatty") and sys.stdin.isatty()
@@ -1878,7 +1858,6 @@ def _read_terminal_line(prompt: str) -> str:
                 matches.append((f"/load {name}", f"{name} ({size_str})"))
             return matches[:8]
 
-        # Dynamic picker for /load model names.
         if lower_text == "/load":
             model_matches = _load_model_matches("")
             if model_matches:
@@ -2040,7 +2019,6 @@ def _read_terminal_line(prompt: str) -> str:
                 try:
                     next_ch = msvcrt.getwch()
                     if next_ch == "\x0f":
-                        # Shift+Tab - also switch mode
                         _render_idle_footer()
                         sys.stdout.flush()
                         return "__TAB__"
@@ -2073,7 +2051,6 @@ def _read_terminal_line(prompt: str) -> str:
         sys.stdout.write("\x1b[?25h")
         sys.stdout.flush()
 
-
 def _consume_escape_keypress() -> bool:
     if os.name != "nt":
         return False
@@ -2099,8 +2076,7 @@ def get_terminal_width():
     try:
         return shutil.get_terminal_size().columns
     except:
-        return 80  
-
+        return 80
 
 def get_terminal_height():
     try:
@@ -2108,10 +2084,8 @@ def get_terminal_height():
     except:
         return 24
 
-
 def _strip_ansi(text: str) -> str:
     return ANSI_ESCAPE_RE.sub("", text or "")
-
 
 def _visible_tail(text: str, max_len: int) -> str:
     if max_len <= 0:
@@ -2123,7 +2097,6 @@ def _visible_tail(text: str, max_len: int) -> str:
         return value[-max_len:]
     return "..." + value[-(max_len - 3):]
 
-
 def _supports_unicode_ui() -> bool:
     encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
     try:
@@ -2132,10 +2105,8 @@ def _supports_unicode_ui() -> bool:
     except Exception:
         return False
 
-
 def _ui_line_char() -> str:
     return "─" if _supports_unicode_ui() else "-"
-
 
 def _format_command_chip(text: str) -> str:
     payload = str(text or "")
@@ -2145,10 +2116,8 @@ def _format_command_chip(text: str) -> str:
         return payload
     return f"\x1b[48;5;238m\x1b[38;5;252m{payload}{Colors.ENDC}"
 
-
 def _log_output_row() -> int:
     return max(1, int(INPUT_AREA_START_ROW) - 2)
-
 
 def _clear_last_terminal_lines(line_count: int) -> None:
     if line_count <= 0:
@@ -2163,7 +2132,6 @@ def _clear_last_terminal_lines(line_count: int) -> None:
         sys.stdout.write("\x1b[2K")
     sys.stdout.write("\r")
     sys.stdout.flush()
-
 
 def _clear_log_area() -> None:
     stdin_ok = hasattr(sys.stdin, "isatty") and sys.stdin.isatty()
@@ -2187,11 +2155,9 @@ def _clear_log_area() -> None:
     sys.stdout.write(f"\x1b[{_log_output_row()};1H")
     sys.stdout.flush()
 
-
 def _should_pin_input_top() -> bool:
     value = os.environ.get("RUN_AI_PIN_INPUT_TOP", "1").strip().lower()
     return value in {"1", "true", "yes", "on"}
-
 
 def _prepare_top_input_area(lines: Optional[int] = None) -> None:
     global INPUT_AREA_CLEAR_LINES, INPUT_AREA_START_ROW
@@ -2212,8 +2178,7 @@ def _prepare_top_input_area(lines: Optional[int] = None) -> None:
     INPUT_AREA_START_ROW = row
     INPUT_AREA_CLEAR_LINES = lines
 
-    # Keep logs above the input area in a dedicated scroll region.
-    log_bottom = max(1, row - 2)  # one visual gap above input area
+    log_bottom = max(1, row - 2)
     sys.stdout.write(f"\x1b[1;{log_bottom}r")
 
     sys.stdout.write(f"\x1b[{row};1H")
@@ -2225,12 +2190,10 @@ def _prepare_top_input_area(lines: Optional[int] = None) -> None:
         sys.stdout.write(f"\x1b[{lines - 1}A")
     sys.stdout.flush()
 
-
 def _count_rendered_lines(text: str) -> int:
     if text is None:
         return 1
     return max(1, str(text).count("\n") + 1)
-
 
 def _format_elapsed_label(elapsed_seconds: float) -> str:
     elapsed = max(0.0, float(elapsed_seconds))
@@ -2239,13 +2202,11 @@ def _format_elapsed_label(elapsed_seconds: float) -> str:
     seconds = elapsed % 60
     return f"[time: {hours:02d}.{minutes:02d}.{seconds:05.2f}]"
 
-
 def _extract_plan_content(text: str) -> str:
     payload = (text or "").strip()
     if not payload:
         return ""
 
-    # If model returned single fenced block, use block content directly.
     fence_matches = re.findall(r"```(?:markdown|md)?\n(.*?)```", payload, flags=re.IGNORECASE | re.DOTALL)
     if len(fence_matches) == 1:
         payload = (fence_matches[0] or "").strip()
@@ -2281,7 +2242,6 @@ def _extract_plan_content(text: str) -> str:
     payload = re.sub(r"\n{3,}", "\n\n", payload)
     return payload.strip()
 
-
 def _looks_like_diagram_only_plan(text: str) -> bool:
     content = (text or "").strip()
     if not content:
@@ -2315,7 +2275,6 @@ def _looks_like_diagram_only_plan(text: str) -> bool:
     too_few_plan_markers = numbered_steps < 4 and heading_lines < 3
     return too_many_diagrams and too_few_plan_markers
 
-
 def _read_arrow_choice(title: str, options: List[Tuple[str, str]], default_idx: int = 0) -> str:
     if not options:
         return ""
@@ -2338,7 +2297,7 @@ def _read_arrow_choice(title: str, options: List[Tuple[str, str]], default_idx: 
         return options[idx][0]
 
     try:
-        import msvcrt  # type: ignore
+        import msvcrt
     except Exception:
         raw = input(f"{title} [{'/'.join(k for k, _ in options)}]: ").strip().lower()
         if not raw:
@@ -2367,7 +2326,6 @@ def _read_arrow_choice(title: str, options: List[Tuple[str, str]], default_idx: 
         width = max(32, get_terminal_width())
         hz = "─" if _supports_unicode_ui() else "-"
         _prepare_top_input_area(lines=lines)
-        # Wyświetl tylko jedną linię separatora (nie dwie)
         sys.stdout.write("\r\x1b[2K" + f"\033[90m{hz * width}\033[0m")
         sys.stdout.write(f"\x1b[{_log_output_row()};1H")
         sys.stdout.flush()
@@ -2445,16 +2403,9 @@ def _read_arrow_choice(title: str, options: List[Tuple[str, str]], default_idx: 
             if matched:
                 _render()
 
-
-# ============ SEPARATOR LINE - WHITE ============
-
 def _get_separator_line() -> str:
-    """Zwraca białą linię separatora"""
     term_width = get_terminal_width()
     return _ui_line_char() * term_width
-
-
-# ============ WELCOME ============
 
 def print_welcome():
     global INPUT_AREA_START_ROW, INPUT_AREA_CLEAR_LINES
@@ -2464,7 +2415,7 @@ def print_welcome():
     if stdin_ok and stdout_ok:
         sys.stdout.write("\x1b[r")
         sys.stdout.flush()
-    
+
     terminal_width = get_terminal_width()
     terminal_width = max(terminal_width, 40)
 
@@ -2517,7 +2468,6 @@ def _should_show_welcome() -> bool:
     value = os.environ.get("RUN_AI_SHOW_WELCOME", "1").strip().lower()
     return value in {"1", "true", "yes", "on"}
 
-
 def _ensure_windows_user_path_contains(path_entry: str) -> bool:
     if os.name != "nt" or not winreg or not path_entry:
         return False
@@ -2544,7 +2494,6 @@ def _ensure_windows_user_path_contains(path_entry: str) -> bool:
         new_parts = parts + [path_entry]
         new_path = ";".join(new_parts)
         winreg.SetValueEx(env_key, "Path", 0, value_type, new_path)
-        # Refresh current process PATH for immediate use without dropping system entries.
         process_parts = [p.strip() for p in os.environ.get("PATH", "").split(";") if p.strip()]
         process_lower = {p.lower() for p in process_parts}
         if path_entry.lower() not in process_lower:
@@ -2555,7 +2504,6 @@ def _ensure_windows_user_path_contains(path_entry: str) -> bool:
         return False
     finally:
         winreg.CloseKey(env_key)
-
 
 def install_global_launcher(silent: bool = False) -> bool:
     if os.name != "nt":
@@ -2600,9 +2548,6 @@ def install_global_launcher(silent: bool = False) -> bool:
             print(f"Launcher install failed: {e}")
         return False
 
-
-# ============ HELP - ORIGINAL WITH MODE ============
-
 def _print_help_section(title: str, rows: List[Tuple[str, str]]) -> None:
     if not rows:
         return
@@ -2612,30 +2557,26 @@ def _print_help_section(title: str, rows: List[Tuple[str, str]]) -> None:
     for command, description in rows:
         print(f"  {command.ljust(command_width)}  {description}")
 
-
 def show_help():
     term_width = shutil.get_terminal_size().columns
-    
+
     if term_width < 100:
         term_width = 100
-    
-    # 3 kolumny: MODELS, CHAT, MODE
+
     col_width = (term_width - 6) // 3
     sep_width = 2
-    
+
     sep = _get_separator_line()
     print(f"\n{sep}")
     print(f"{'HELP':^{term_width}}")
     print(f"{sep}")
-    
-    # Nagłówki 3 kolumn
+
     models_header = f"{'MODELS':^{col_width}}"
     chat_header = f"{'CHAT':^{col_width}}"
     mode_header = f"{'MODE':^{col_width}}"
     print(f"\n{models_header}{' ' * sep_width}{chat_header}{' ' * sep_width}{mode_header}")
     print(_ui_line_char() * term_width)
-    
-    # Dane dla każdej kolumny
+
     models_cmds = [
         ("/models", "List local GGUF models"),
         ("/load", "Choose model from list"),
@@ -2646,7 +2587,7 @@ def show_help():
         ("/pull <url>", "Alias for download"),
         ("/unload", "Unload model from RAM")
     ]
-    
+
     chat_cmds = [
         ("/ai", "Start chat mode"),
         ("/chat <text>", "Send message"),
@@ -2658,7 +2599,7 @@ def show_help():
         ("Tab", "Switch mode"),
         ("", "")
     ]
-    
+
     mode_cmds = [
         (f"{Colors.MODE_CHAT}chat{Colors.ENDC}", "Standard chat mode"),
         (f"{Colors.MODE_PLAN}plan{Colors.ENDC}", f"Creates {PLAN_FILENAME}"),
@@ -2669,38 +2610,36 @@ def show_help():
         ("", ""),
         ("", "")
     ]
-    
-    # Wyświetl 3 kolumny równolegle
+
     max_rows = max(len(models_cmds), len(chat_cmds), len(mode_cmds))
     for i in range(max_rows):
         model_cmd = models_cmds[i] if i < len(models_cmds) else ("", "")
         chat_cmd = chat_cmds[i] if i < len(chat_cmds) else ("", "")
         mode_cmd = mode_cmds[i] if i < len(mode_cmds) else ("", "")
-        
+
         if model_cmd[0]:
             left = f"{model_cmd[0]:<16} {model_cmd[1]}"
         else:
             left = ""
         left_formatted = f"{left:<{col_width}}"
-        
+
         if chat_cmd[0]:
             middle = f"{chat_cmd[0]:<16} {chat_cmd[1]}"
         else:
             middle = ""
         middle_formatted = f"{middle:<{col_width}}"
-        
+
         if mode_cmd[0]:
             right = f"{mode_cmd[0]:<12} {mode_cmd[1]}"
         else:
             right = ""
         right_formatted = f"{right:<{col_width}}"
-        
+
         print(f"{left_formatted}{' ' * sep_width}{middle_formatted}{' ' * sep_width}{right_formatted}")
-    
-    # Druga sekcja: SYSTEM, SERVER, SHORTCUTS
+
     print(f"\n{'SYSTEM':^{col_width}}{' ' * sep_width}{'SERVER':^{col_width}}{' ' * sep_width}{'SHORTCUTS':^{col_width}}")
     print(_ui_line_char() * term_width)
-    
+
     system_cmds = [
         ("/install-launcher", "Install CMDAI global command"),
         ("/status", "Show app status"),
@@ -2713,7 +2652,7 @@ def show_help():
         system_cmds.insert(0, ("/install", "Install AI engine"))
     else:
         system_cmds.insert(0, ("/update", "Update llama-cpp"))
-    
+
     server_cmds = [
         (f"http://localhost:{HTTP_PORT}", "API endpoint"),
         ("GET /tags", "List models"),
@@ -2721,7 +2660,7 @@ def show_help():
         ("POST /chat", "Chat endpoint"),
         ("POST /pull", "Download model")
     ]
-    
+
     shortcut_cmds = [
         ("Tab", "Switch mode"),
         ("Esc", "Cancel current input"),
@@ -2732,38 +2671,37 @@ def show_help():
         ("/mode", "Change mode"),
         ("Enter", "Accept PLAN/CODE output")
     ]
-    
+
     max_rows2 = max(len(system_cmds), len(server_cmds), len(shortcut_cmds))
     for i in range(max_rows2):
         sys_cmd = system_cmds[i] if i < len(system_cmds) else ("", "")
         srv_cmd = server_cmds[i] if i < len(server_cmds) else ("", "")
         sh_cmd = shortcut_cmds[i] if i < len(shortcut_cmds) else ("", "")
-        
+
         if sys_cmd[0]:
             left = f"{sys_cmd[0]:<16} {sys_cmd[1]}"
         else:
             left = ""
         left_formatted = f"{left:<{col_width}}"
-        
+
         if srv_cmd[0]:
             middle = f"{srv_cmd[0]:<16} {srv_cmd[1]}"
         else:
             middle = ""
         middle_formatted = f"{middle:<{col_width}}"
-        
+
         if sh_cmd[0]:
             right = f"{sh_cmd[0]:<12} {sh_cmd[1]}"
         else:
             right = ""
         right_formatted = f"{right:<{col_width}}"
-        
+
         print(f"{left_formatted}{' ' * sep_width}{middle_formatted}{' ' * sep_width}{right_formatted}")
-    
+
     print(f"{sep}")
 
     if LAST_UPDATE_STATUS is not None:
         print(f"\n   Update status: {LAST_UPDATE_STATUS}")
-
 
 def show_mode_help():
     print("\nMODE HELP")
@@ -2778,7 +2716,6 @@ def show_mode_help():
     print("    /mode chat | /mode plan | /mode code")
     print("    Tab (or Shift+Tab) to switch mode")
     print(_ui_line_char() * 60)
-
 
 def show_models_menu() -> Tuple[List[Dict[str, Any]], int]:
     lines_printed = 0
@@ -2825,11 +2762,9 @@ def show_models_menu() -> Tuple[List[Dict[str, Any]], int]:
     _emit("  Enter model number to load (or 'q' / Esc to cancel):")
     return models, lines_printed
 
-
 def get_load_prompt() -> str:
     current = loader.current_model if (loader and loader.current_model) else "none"
     return f"load [{current}] "
-
 
 def _pick_model_name(models: List[Dict[str, Any]], title: str = "/load") -> str:
     if not models:
@@ -2852,7 +2787,6 @@ def _pick_model_name(models: List[Dict[str, Any]], title: str = "/load") -> str:
         return ""
     return selected
 
-
 def show_download_catalog():
     aliases = loader.list_model_aliases() if loader else []
     sep60 = _ui_line_char() * 60
@@ -2869,7 +2803,6 @@ def show_download_catalog():
     print(sep60)
     print("Usage: /download <alias|url|owner/repo/file.gguf> [file.gguf]")
 
-
 def show_status():
     sep = _get_separator_line()
     print(f"\n{sep}")
@@ -2877,9 +2810,9 @@ def show_status():
     print(f"{sep}")
 
     mode_color = Colors.MODE_CHAT if CURRENT_MODE == AppMode.CHAT else (Colors.MODE_PLAN if CURRENT_MODE == AppMode.PLAN else Colors.MODE_CODE)
-    
+
     print(f"\n  Mode: {mode_color}{CURRENT_MODE.upper()}{Colors.ENDC}")
-    
+
     print("\nSYSTEM:")
     print(f"  OS: {sys.platform}")
     print(f"  Python: {sys.version.split()[0]}")
@@ -2891,17 +2824,14 @@ def show_status():
             print(f"  Context: {loader.model.n_ctx} tokens")
     else:
         print("  No model loaded")
-    
+
     print("\nIDE INTEGRATION:")
     if ide_integration:
         status = ide_integration.get_status()
         print(f"  Active: {status['active'] or 'None'}")
         print(f"  Available: {', '.join(status['available']) or 'None detected'}")
-    
+
     print(f"\n{sep}")
-
-
-# ============ PROMPT BUILDERS ============
 
 def _build_chat_prompt(user_text: str, history: Optional[List[Dict[str, str]]] = None) -> str:
     lines = []
@@ -2928,7 +2858,6 @@ def _build_chat_prompt(user_text: str, history: Optional[List[Dict[str, str]]] =
     lines.append("<|assistant|>")
 
     return "\n".join(lines)
-
 
 def _build_plan_prompt(user_text: str, history: Optional[List[Dict[str, str]]] = None) -> str:
     lines = []
@@ -2981,7 +2910,6 @@ def _build_plan_prompt(user_text: str, history: Optional[List[Dict[str, str]]] =
 
     return "\n".join(lines)
 
-
 def _build_code_prompt(user_text: str, history: Optional[List[Dict[str, str]]] = None) -> str:
     lines = []
     lines.append("<|system|>")
@@ -3003,7 +2931,7 @@ def _build_code_prompt(user_text: str, history: Optional[List[Dict[str, str]]] =
         lines.append(f"Active IDE: {ide_integration.active_ide.get('name', 'unknown')}")
     if ide_integration and ide_integration.project_root:
         lines.append(f"Project root: {ide_integration.project_root}")
-    
+
     if code_file_manager:
         md_context = code_file_manager.load_markdown_context()
         if md_context:
@@ -3015,7 +2943,7 @@ def _build_code_prompt(user_text: str, history: Optional[List[Dict[str, str]]] =
             lines.append(project_index)
 
     lines.append("<|end|>")
-    
+
     if history:
         for msg in history[-10:]:
             role = msg.get("role", "")
@@ -3028,14 +2956,13 @@ def _build_code_prompt(user_text: str, history: Optional[List[Dict[str, str]]] =
                 lines.append(f"<|assistant|>")
                 lines.append(content)
                 lines.append("<|end|>")
-    
+
     lines.append("<|user|>")
     lines.append(f"[CODE MODE] {user_text}")
     lines.append("<|end|>")
     lines.append("<|assistant|>")
-    
-    return "\n".join(lines)
 
+    return "\n".join(lines)
 
 def _get_mode_prompt(user_text: str, history: Optional[List[Dict[str, str]]] = None) -> str:
     if CURRENT_MODE == AppMode.PLAN:
@@ -3044,9 +2971,6 @@ def _get_mode_prompt(user_text: str, history: Optional[List[Dict[str, str]]] = N
         return _build_code_prompt(user_text, history)
     else:
         return _build_chat_prompt(user_text, history)
-
-
-# ============ GENERATION ============
 
 def _run_with_spinner(
     func,
@@ -3079,11 +3003,11 @@ def _run_with_spinner(
     msvcrt_mod = None
     if allow_cancel and os.name == "nt":
         try:
-            import msvcrt as _msvcrt  # type: ignore
+            import msvcrt as _msvcrt
             msvcrt_mod = _msvcrt
         except Exception:
             msvcrt_mod = None
-    
+
     while not finished.wait(0.1):
         if allow_cancel and cancel_event is not None and msvcrt_mod is not None:
             try:
@@ -3117,7 +3041,6 @@ def _run_with_spinner(
         idx += 1
 
         if cancel_requested:
-            # Do not block UI waiting too long for background cancellation.
             finished.wait(0.15)
             break
 
@@ -3136,7 +3059,6 @@ def _run_with_spinner(
         raise outcome["error"]
     return outcome["value"], time.time() - started
 
-
 def _generate_with_live_status(
     loader,
     full_prompt: str,
@@ -3146,10 +3068,6 @@ def _generate_with_live_status(
     cancel_event: threading.Event,
     show_progress: bool = True
 ) -> Tuple[str, float]:
-    """
-    Generuje odpowiedź ze streamingiem i wyświetlaniem statusów na żywo.
-    Wychwytuje [[STATUS]]tekst[[/STATUS]] i pokazuje jako szary spinner.
-    """
     started = time.time()
     chunks: List[str] = []
     current_status = ""
@@ -3157,33 +3075,29 @@ def _generate_with_live_status(
     frames = ["|", "/", "-", "\\"]
     idx = 0
     last_len = 0
-    
+
     pinned_input = _should_pin_input_top()
-    
-    # Regex do wychwytywania statusów
+
     status_pattern = re.compile(r'\[\[STATUS\]\](.*?)\[\[/STATUS\]\]', re.DOTALL)
-    
-    # Wątek do aktualizacji spinnera podczas oczekiwania
+
     spinner_running = threading.Event()
     spinner_running.set()
-    
+
     def update_spinner():
-        """Aktualizuje spinner co 100ms podczas oczekiwania na tokeny"""
         local_idx = 0
         while spinner_running.is_set():
-            if show_progress and not chunks:  # Tylko gdy jeszcze nie ma tokenów
+            if show_progress and not chunks:
                 elapsed = max(0.0, time.time() - started)
                 plain_line = f"{_format_elapsed_label(elapsed)} {frames[local_idx % len(frames)]}"
                 sys.stdout.write(f"\r{plain_line}")
                 sys.stdout.flush()
                 local_idx += 1
             time.sleep(0.1)
-    
-    # Uruchom wątek spinnera
+
     if show_progress:
         spinner_thread = threading.Thread(target=update_spinner, daemon=True)
         spinner_thread.start()
-    
+
     try:
         token_stream = loader.generate(
             prompt=full_prompt,
@@ -3193,94 +3107,71 @@ def _generate_with_live_status(
             stream=True,
             cancel_event=cancel_event,
         )
-        
+
         for token in token_stream:
-            # Zatrzymaj wątek spinnera gdy przyjdzie pierwszy token
             if chunks and spinner_running.is_set():
                 spinner_running.clear()
-            
+
             if cancel_event.is_set():
                 break
-                
+
             chunks.append(token)
             accumulated_text += token
-            
-            # Szukaj statusów w zgromadzonym tekście
+
             status_match = status_pattern.search(accumulated_text)
             if status_match:
                 new_status = status_match.group(1).strip()
-                # Ogranicz do max 2 słów
                 words = new_status.split()[:2]
                 current_status = " ".join(words)
-                
-                # Usuń przetworzony status z accumulated_text
+
                 accumulated_text = status_pattern.sub("", accumulated_text, count=1)
-            
-            # Wyświetl spinner z aktualnym statusem
+
             if show_progress:
                 elapsed = max(0.0, time.time() - started)
                 if current_status:
-                    # Szary status od AI
                     plain_line = f"{_format_elapsed_label(elapsed)} {Colors.ACTION_STATUS}{current_status}{Colors.ENDC} {frames[idx % len(frames)]}"
                 else:
                     plain_line = f"{_format_elapsed_label(elapsed)} {frames[idx % len(frames)]}"
-                
-                # Zawsze wyświetlaj w normalnym obszarze wyjścia (nie nad inputem)
+
                 sys.stdout.write(f"\r{plain_line}")
                 sys.stdout.flush()
                 last_len = len(_strip_ansi(plain_line))
-            
+
             idx += 1
-        
-        # Zatrzymaj wątek spinnera
+
         spinner_running.clear()
-    
+
     except Exception as e:
-        spinner_running.clear()  # Zatrzymaj wątek spinnera
+        spinner_running.clear()
         if show_progress:
             sys.stdout.write("\r" + " " * last_len + "\r")
             sys.stdout.flush()
         raise e
-    
-    # Wyczyść spinner
+
     if show_progress:
         sys.stdout.write("\r" + " " * last_len + "\r")
         sys.stdout.flush()
-    
+
     elapsed = time.time() - started
     full_response = "".join(chunks)
-    
-    # Usuń wszystkie tagi STATUS z finalnej odpowiedzi
+
     clean_response = status_pattern.sub("", full_response)
-    
+
     return clean_response, elapsed
 
-
 def _extract_and_display_actions(text: str) -> Tuple[List[str], str]:
-    """
-    Wyciąga akcje z tekstu, wyświetla je na szaro i zwraca czystą odpowiedź.
-    
-    Format w odpowiedzi modelu: [[ACTION]]Tworzę plik config.json[[/ACTION]]
-    
-    Returns:
-        Tuple[List[str], str]: (lista akcji, czysty tekst bez akcji)
-    """
     actions = []
     clean_text = text
-    
-    # Znajdź wszystkie akcje
+
     for match in ACTION_RE.finditer(text):
         action_text = match.group(1).strip()
         if action_text:
             actions.append(action_text)
-            # Wyświetl akcję na szaro
             print(f"{Colors.ACTION_STATUS}→ {action_text}{Colors.ENDC}")
-    
-    # Usuń tagi akcji z tekstu
-    clean_text = ACTION_RE.sub("", text).strip()
-    
-    return actions, clean_text
 
+    clean_text = ACTION_RE.sub("", text).strip()
+
+    return actions, clean_text
 
 def send_terminal_prompt(prompt: str, max_tokens: int = -1, temperature: float = 0.7, top_p: float = 0.9) -> bool:
     global TERMINAL_CHAT_HISTORY, CURRENT_MODE, code_file_manager
@@ -3311,7 +3202,6 @@ def send_terminal_prompt(prompt: str, max_tokens: int = -1, temperature: float =
             full_prompt = _get_mode_prompt(user_input_for_model, TERMINAL_CHAT_HISTORY)
             cancel_event = threading.Event()
 
-            # Pokazuj timer dla wszystkich trybów
             show_progress = True
 
             try:
@@ -3371,7 +3261,6 @@ def send_terminal_prompt(prompt: str, max_tokens: int = -1, temperature: float =
                     print("[PLAN] ERROR: File manager unavailable.")
                     return False
 
-                # Save draft immediately so the file exists before final confirmation.
                 plan_path = code_file_manager.create_plan_file(plan_body)
                 if not plan_path:
                     print("[PLAN] ERROR: Failed to save plan file.")
@@ -3473,16 +3362,15 @@ def send_terminal_prompt(prompt: str, max_tokens: int = -1, temperature: float =
         print(f"ERROR: Chat generation failed: {e}")
         return False
 
-
 def _extract_visible_answer(raw_text: str) -> str:
     if not raw_text:
         return ""
-    
+
     text = raw_text.replace("\ufeff", "").replace("\u200b", "")
     text = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", text)
     text = re.sub(r"\r\n?", "\n", text)
     text = text.replace("\x00", "")
-    
+
     block_patterns = [
         r"<\s*think\s*>.*?<\s*/\s*think\s*>",
         r"<\s*analysis\s*>.*?<\s*/\s*analysis\s*>",
@@ -3503,7 +3391,6 @@ def _extract_visible_answer(raw_text: str) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
-
 def _request_mode_approval(mode: str) -> Tuple[str, str]:
     decision = _read_arrow_choice(
         f"[{mode.upper()}] Confirm",
@@ -3522,7 +3409,6 @@ def _request_mode_approval(mode: str) -> Tuple[str, str]:
 
     return "revise", feedback
 
-
 def _build_revision_request(base_text: str, feedback: str, mode: str) -> str:
     return (
         f"{base_text}\n\n"
@@ -3532,14 +3418,12 @@ def _build_revision_request(base_text: str, feedback: str, mode: str) -> str:
         "Return a full updated result."
     )
 
-
 def _print_code_structure(title: str, items: List[Dict[str, Any]]) -> None:
     print(f"\n[CODE] {title}")
     for item in items:
         rel_path = item.get("relative_path", "")
         action = item.get("action", "write")
         print(f"  - {action}: {rel_path}")
-
 
 def _format_code_change_summary(items: List[Dict[str, Any]]) -> str:
     if not items:
@@ -3552,7 +3436,6 @@ def _format_code_change_summary(items: List[Dict[str, Any]]) -> str:
     if len(paths) == 2:
         return f"applied {paths[0]} and {paths[1]}"
     return f"applied {paths[0]} (+{len(paths) - 1} more)"
-
 
 def _print_text_panel(title: str, text: str, tone: str = "normal", max_lines: int = 80, max_cols: int = 140) -> int:
     lines_printed = 0
@@ -3584,7 +3467,6 @@ def _print_text_panel(title: str, text: str, tone: str = "normal", max_lines: in
     lines_printed += 1
     return lines_printed
 
-
 def _print_code_change_preview(change: Dict[str, Any], index: int, total: int, max_lines: int = 18, max_cols: int = 120) -> int:
     rel_path = (change or {}).get("relative_path", "unknown")
     language = (change or {}).get("language", "txt")
@@ -3614,26 +3496,21 @@ def _print_code_change_preview(change: Dict[str, Any], index: int, total: int, m
     lines_printed += 1
     return lines_printed
 
-
 def _is_escape_input(text: str) -> bool:
     value = (text or "").strip().lower()
     return value in {"/exit", "/quit"}
-
 
 def _is_chat_pause_toggle(text: str) -> bool:
     value = (text or "").strip().lower()
     return value in {"/pause"}
 
-
 def _is_model_unload_shortcut(text: str) -> bool:
     value = (text or "").strip().lower()
     return value in {"/unload"}
 
-
 def _is_mode_switch_shortcut(text: str) -> bool:
     value = (text or "").strip().lower()
     return value in {"/m", "/mode", "/switch"}
-
 
 def _handle_go_command() -> bool:
     global CURRENT_MODE
@@ -3653,10 +3530,9 @@ def _handle_go_command() -> bool:
         print(f"ERROR: {PLAN_FILENAME} is empty.")
         return False
 
-    # Wyświetl komendę użytkownika
     mode_color = Colors.MODE_CODE
     print(f"\n{mode_color}[CODE]{Colors.ENDC}> /go")
-    
+
     CURRENT_MODE = AppMode.CODE
     go_prompt = (
         f"Execute the implementation based on {PLAN_FILENAME}. "
@@ -3665,7 +3541,6 @@ def _handle_go_command() -> bool:
         f"Plan content:\n{plan_content[:6000]}"
     )
     return send_terminal_prompt(go_prompt, max_tokens=1800, temperature=0.2, top_p=0.9)
-
 
 def _handle_ide_command(raw_command: str) -> bool:
     global ide_integration
@@ -3767,7 +3642,6 @@ def _handle_ide_command(raw_command: str) -> bool:
     print("Usage: /ide [list|use <id|number>|open <file> [line] [col]]")
     return False
 
-
 def _handle_swap_command(raw_command: str) -> bool:
     global TERMINAL_CHAT_HISTORY
     if not loader:
@@ -3803,14 +3677,12 @@ def _handle_swap_command(raw_command: str) -> bool:
         print("INFO: Model swapped. Chat history kept.")
     return swapped
 
-
 def _handle_mode_command(raw_command: str) -> bool:
-    """Obsługuje komendy związane z trybami pracy"""
     global CURRENT_MODE
-    
+
     parts = raw_command.strip().split(maxsplit=2)
     subcommand = parts[1].lower() if len(parts) > 1 else ""
-    
+
     if subcommand in ["chat", "c"]:
         CURRENT_MODE = AppMode.CHAT
         return True
@@ -3821,7 +3693,6 @@ def _handle_mode_command(raw_command: str) -> bool:
         CURRENT_MODE = AppMode.CODE
         return True
     elif subcommand in ["next", "n", "switch", ""]:
-        # Przełącz na następny tryb
         if CURRENT_MODE == AppMode.CHAT:
             CURRENT_MODE = AppMode.PLAN
         elif CURRENT_MODE == AppMode.PLAN:
@@ -3834,28 +3705,25 @@ def _handle_mode_command(raw_command: str) -> bool:
         print("Available: chat, plan, code, next")
         return False
 
-
-# ============ CHAT SESSION ============
-
 def run_terminal_chat_session() -> None:
     global TERMINAL_CHAT_HISTORY, CURRENT_MODE
-    
+
     if not loader or not loader.current_model:
         print("ERROR: No model loaded. Use 'load' first.")
         return
 
     chat_paused = False
-    
+
     while True:
         try:
             user_text = _read_terminal_line(get_mode_prompt())
-            
+
             if user_text == "__TAB__":
                 _handle_mode_command("/mode next")
                 continue
             if user_text == "\x1b":
                 continue
-                
+
         except KeyboardInterrupt:
             print("\nChat interrupted.")
             break
@@ -3961,7 +3829,6 @@ def run_terminal_chat_session() -> None:
 
         send_terminal_prompt(command_text)
 
-
 def _should_keep_terminal_open() -> bool:
     value = os.environ.get("RUN_AI_KEEP_OPEN", "1").strip().lower()
     return value not in {"0", "false", "no", "off"}
@@ -3977,9 +3844,6 @@ def _wait_before_terminal_close() -> None:
         input("\nPress Enter to close...")
     except EOFError:
         pass
-
-
-# ============ MAIN ============
 
 def main():
     global http_server, loader, HAS_AI_ENGINE, LAST_UPDATE_STATUS, HTTP_PORT, TERMINAL_CHAT_HISTORY, ide_integration, code_file_manager, INPUT_AREA_START_ROW, INPUT_AREA_CLEAR_LINES
@@ -4022,19 +3886,18 @@ def main():
         main_chat_paused = False
         while True:
             try:
-                # Jeśli model załadowany - od razu czat
                 if loader and loader.current_model:
                     run_terminal_chat_session()
                     continue
-                
+
                 raw_command = _read_terminal_line(get_mode_prompt()).strip()
-                
+
                 if raw_command == "__TAB__":
                     _handle_mode_command("/mode next")
                     continue
                 if raw_command == "\x1b":
                     continue
-                    
+
                 if not raw_command:
                     continue
 
@@ -4133,12 +3996,12 @@ def main():
                     parts = raw_command.split(maxsplit=2)
                     source = parts[1].strip() if len(parts) > 1 else ""
                     output_name = parts[2].strip() if len(parts) > 2 else None
-                    
+
                     if not source:
                         print("Usage: /download <alias|url> [file.gguf]")
                         show_download_catalog()
                         continue
-                    
+
                     if not loader:
                         print("ERROR: Loader not initialized")
                         continue
@@ -4249,15 +4112,12 @@ def main():
         print("Goodbye!")
 
 def handle_launch_command():
-    """Obsługuje komendę 'CMDAI launch' - uruchamia aplikację"""
     args = sys.argv[1:]
-    
-    # Jeśli brak argumentów lub 'launch' - uruchom aplikację
+
     if len(args) == 0 or args[0].lower() in ('launch', 'start', 'run'):
         main()
         return
-    
-    # Jeśli 'help' lub '-h' lub '--help' - pokaż pomoc launchera
+
     if args[0].lower() in ('help', '-h', '--help', '/?'):
         print("CMDAI Launcher")
         print("=" * 40)
@@ -4272,8 +4132,7 @@ def handle_launch_command():
         print("  CMDAI launch    # Launch application")
         print("  python run.py   # Launch application")
         return
-    
-    # Nieznana komenda
+
     print(f"Unknown command: {args[0]}")
     print("Use 'CMDAI help' for usage information.")
 
