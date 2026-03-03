@@ -25,8 +25,10 @@ The application runs completely offline, using only local GGUF models, ensuring 
 
 1. Python 3.11+ required.
 2. Install a GGUF model and copy it to models/.
-3. Run the application:
-`CMDAI launch` in cmd 
+3. Run the application in cmd
+```cmd
+CMDAI launch 
+```
 ## or
 Double-click on the file `run.py`
 5. Load the model:
@@ -124,6 +126,7 @@ CMD LOCAL AI is a project being developed step by step. Below are the directions
 ---
 
 ### 🤗 THANKS FOR READING :)
+
 
 
 
