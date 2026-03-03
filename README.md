@@ -31,6 +31,7 @@ CMDAI launch
 ```
 ## or
 Double-click on the file `run.py`
+
 5. Load the model:
 `/load`
 6. Talk to the model
@@ -126,6 +127,7 @@ CMD LOCAL AI is a project being developed step by step. Below are the directions
 ---
 
 ### 🤗 THANKS FOR READING :)
+
 
 
 
