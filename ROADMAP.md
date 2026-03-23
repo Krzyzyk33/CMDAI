@@ -3,8 +3,6 @@
 # Update 1.1.2beta
 Released: 2026-03-23
 
-# v1.1.2beta
-
 ## New mode 
 1. Debug mode 
 2. Analityst mode 
