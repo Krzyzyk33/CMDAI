@@ -1,6 +1,6 @@
 # CMD LOCAL AI - Changelog
 
-## Update 1.1.2beta
+# Update 1.1.2beta
 Released: 2026-03-23
 
 # v1.1.2beta
@@ -43,7 +43,7 @@ Please report bugs
 
 ---
 
-## Update 1.1.1beta
+# Update 1.1.1beta
 Released: 2026-03-09
 
 This is the largest update to CMDAI so far, introducing new modes!  We've focused on enhancing usability and adding powerful tools for AI interaction. Please test thoroughly and report any bugs in the Issues section – your feedback is crucial!
@@ -90,7 +90,7 @@ new modes, features, and commands! We've focused on enhancing usability and addi
 
 ---
 
-## Update 1.1.0
+# Update 1.1.0
 Released: 2026-02-23
 
 ### Fix Bugs 
@@ -117,7 +117,7 @@ Released: 2026-02-23
 
 ---
 
-## Update 1.1.0beta 
+# Update 1.1.0beta 
 Released: 2026-02-20
 
 ### Model Loading Improvements
@@ -132,7 +132,7 @@ Released: 2026-02-20
 ### Command Changes
 1. Removed quick commands to simplify the command structure.
 
-## Update 1.0.0
+# Update 1.0.0
 Released: 2026-02-19
 
 ### Chat UX Improvements
