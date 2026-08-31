@@ -1,4 +1,4 @@
-#CMDAI 
+# CMDAI 
 
 A local terminal AI assistant based on GGUF and llama‑cpp‑python models.
 No cloud. Complete privacy.
