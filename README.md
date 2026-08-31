@@ -1,17 +1,7 @@
-![CMDAI](assets/CMDAI.ico)
----
+#CMDAI 
 
 A local terminal AI assistant based on GGUF and llama‑cpp‑python models.
 No cloud. Complete privacy.
-
----
-
-## 🎥 Demo
-
-[![CMDAI Demo](https://krzyzyk33.github.io/VideoHub/thumbnails/CMDAIDEMO.png)](https://krzyzyk33.github.io/VideoHub/Videos/CMDAIDemo.mp4)
-
-### This video is on VideoHub 
-Link:https://krzyzyk33.github.io/VideoHub/VideoHub.html
 
 ---
 
